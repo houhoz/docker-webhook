@@ -2,6 +2,7 @@ const http = require('http')
 const { execSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
+const url = require('url')
 
 // 递归删除目录
 function deleteFolderRecursive(path) {
@@ -33,9 +34,12 @@ const resolvePost = req =>
 
 http
   .createServer(async (req, res) => {
+    const params = url.parse(req.url, true).query
+    const port = params?.port
     console.log('receive request')
     console.log(req.url)
-    if (req.method === 'POST' && req.url === '/') {
+    console.log(params?.port)
+    if (req.method === 'POST' && req.url.includes('/github')) {
       const data = await resolvePost(req)
       const projectDir = path.resolve(__dirname, `./${data.repository.name}`)
       deleteFolderRecursive(projectDir)
@@ -67,7 +71,7 @@ http
       })
 
       // // 拉取 docker 镜像
-      // execSync(`docker pull yeyan1996/docker-test-image:latest`, {
+      // execSync(`docker pull houhoz/docker-test-image:latest`, {
       //     stdio: 'inherit',
       //     cwd: projectDir
       // })
@@ -82,7 +86,7 @@ http
 
       // 创建 docker 容器
       execSync(
-        `docker run -d -p 8888:80 --name ${data.repository.name}-container ${data.repository.name}-image:latest`,
+        `docker run -d -p ${port}:80 --name ${data.repository.name}-container ${data.repository.name}-image:latest`,
         {
           stdio: 'inherit',
         }
