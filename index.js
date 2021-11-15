@@ -92,6 +92,6 @@ http
     }
     res.end('ok')
   })
-  .listen(6666, () => {
-    console.log('server is ready')
+  .listen(3000, () => {
+    console.log('server:3000 is ready')
   })
