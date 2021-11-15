@@ -75,6 +75,6 @@ router.post('/deploy', async ctx => {
 
 app.use(router.routes()).use(router.allowedMethods())
 
-app.listen(7777, () => {
-  console.log('listening on 7777 success!')
+app.listen(6666, () => {
+  console.log('listening on 6666 success!')
 })
