@@ -2,7 +2,7 @@ const Koa = require('koa')
 const Router = require('koa-router')
 const body = require('koa-body') // 用来解析post参数
 const crypto = require('crypto')
-const secret = '你在webhook中配置的secret'
+const secret = 'hou123456'
 
 const app = new Koa()
 const router = new Router()
