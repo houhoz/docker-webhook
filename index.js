@@ -54,14 +54,14 @@ http
 
       // 复制 Dockerfile 到项目目录
       fs.copyFileSync(
-        path.resolve(__dirname, `./Dockerfile`),
-        path.resolve(projectDir, './Dockerfile')
+        path.resolve(projectDir, './Dockerfile'),
+        path.resolve(__dirname, `./Dockerfile`)
       )
 
       // 复制 .dockerignore 到项目目录
       fs.copyFileSync(
-        path.resolve(__dirname, `./.dockerignore`),
-        path.resolve(projectDir, './.dockerignore')
+        path.resolve(projectDir, './.dockerignore'),
+        path.resolve(__dirname, `./.dockerignore`)
       )
 
       // 创建 docker 镜像
@@ -70,10 +70,10 @@ http
         cwd: projectDir,
       })
 
-      // // 拉取 docker 镜像
-      // execSync(`docker pull houhoz/docker-test-image:latest`, {
-      //     stdio: 'inherit',
-      //     cwd: projectDir
+      // // 我们每次生成镜像是都未指定标签，从而重名导致有空悬镜像，删除一下
+      // execSync(`docker rmi $(docker images -f "dangling=true" -q)`, {
+      //   stdio: 'inherit',
+      //   cwd: projectDir,
       // })
 
       // 销毁 docker 容器
