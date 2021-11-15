@@ -39,7 +39,7 @@ http
     console.log('receive request')
     console.log(req.url)
     console.log(params?.port)
-    if (req.method === 'POST' && req.url.includes('/github')) {
+    if (req.method === 'POST' && req.url.includes(`/github?port=${port}`)) {
       const data = await resolvePost(req)
       const projectDir = path.resolve(__dirname, `./${data.repository.name}`)
       deleteFolderRecursive(projectDir)
