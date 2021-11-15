@@ -1,80 +1,97 @@
-const Koa = require('koa')
-const Router = require('koa-router')
-const body = require('koa-body') // 用来解析post参数
-const crypto = require('crypto')
-const secret = 'hou123456'
+const http = require('http')
+const { execSync } = require('child_process')
+const fs = require('fs')
+const path = require('path')
 
-const app = new Koa()
-const router = new Router()
-
-function run_cmd(cmd, args, callback) {
-  var spawn = require('child_process').spawn
-  var child = spawn(cmd, args)
-  var resp = ''
-  var endTip = `${args[1]}部署完成, runing on port ${args[2]}`
-  child.stdout.on('data', function (buffer) {
-    resp += buffer.toString()
-  })
-  child.stdout.on('end', function () {
-    callback(resp + ' ' + endTip)
-  })
-}
-
-function sign(data) {
-  return `sha1=${crypto.createHmac('sha1', secret).update(data).digest('hex')}`
-}
-
-app.use(body())
-
-// 一个捕捉错误的中间件
-app.use(async (ctx, next) => {
-  try {
-    await next()
-  } catch (err) {
-    console.log(err)
-    ctx.throw(500)
-  }
-})
-// post
-router.post('/deploy', async ctx => {
-  const port = ctx.query.port
-  const header = ctx.request.header
-  // 参数就是payload
-  const body = ctx.request.body
-  // 事件
-  const event = header['x-github-event']
-  // 签名
-  const sig = header['x-hub-signature']
-  // 本地生成签名
-  const localsig = sign(JSON.stringify(body))
-  // 分支
-  const ref = body.ref
-  // 项目名称
-  const name = body.repository.name
-
-  console.log(ref, event, port)
-  // 验证签名存在
-  if (!sig) {
-    ctx.body = 'no signature!'
-    return
-  }
-  // 验证签名合法
-  if (sig !== localsig) {
-    ctx.body = 'signature is wrong!'
-    return
-  }
-  ctx.body = 'ok'
-  // 仅在 push 主分支时处理
-  if (ref === 'refs/heads/main' && event === 'push') {
-    // 运行
-    run_cmd('sh', ['./deploy.sh', name, port], function (text) {
-      console.log(text)
+// 递归删除目录
+function deleteFolderRecursive(path) {
+  if (fs.existsSync(path)) {
+    fs.readdirSync(path).forEach(function (file) {
+      const curPath = path + '/' + file
+      if (fs.statSync(curPath).isDirectory()) {
+        // recurse
+        deleteFolderRecursive(curPath)
+      } else {
+        // delete file
+        fs.unlinkSync(curPath)
+      }
     })
+    fs.rmdirSync(path)
   }
-})
+}
 
-app.use(router.routes()).use(router.allowedMethods())
+const resolvePost = req =>
+  new Promise(resolve => {
+    let chunk = ''
+    req.on('data', data => {
+      chunk += data
+    })
+    req.on('end', () => {
+      resolve(JSON.parse(chunk))
+    })
+  })
 
-app.listen(6666, () => {
-  console.log('listening on 6666 success!')
-})
+http
+  .createServer(async (req, res) => {
+    console.log('receive request')
+    console.log(req.url)
+    if (req.method === 'POST' && req.url === '/') {
+      const data = await resolvePost(req)
+      const projectDir = path.resolve(__dirname, `./${data.repository.name}`)
+      deleteFolderRecursive(projectDir)
+
+      // 拉取仓库最新代码
+      execSync(
+        `git clone https://github.com/houhoz/${data.repository.name}.git ${projectDir}`,
+        {
+          stdio: 'inherit',
+        }
+      )
+
+      // 复制 Dockerfile 到项目目录
+      fs.copyFileSync(
+        path.resolve(__dirname, `./Dockerfile`),
+        path.resolve(projectDir, './Dockerfile')
+      )
+
+      // 复制 .dockerignore 到项目目录
+      fs.copyFileSync(
+        path.resolve(__dirname, `./.dockerignore`),
+        path.resolve(projectDir, './.dockerignore')
+      )
+
+      // 创建 docker 镜像
+      execSync(`docker build -t ${data.repository.name}-image:latest .`, {
+        stdio: 'inherit',
+        cwd: projectDir,
+      })
+
+      // // 拉取 docker 镜像
+      // execSync(`docker pull yeyan1996/docker-test-image:latest`, {
+      //     stdio: 'inherit',
+      //     cwd: projectDir
+      // })
+
+      // 销毁 docker 容器
+      execSync(
+        `docker ps -a -f "name=^${data.repository.name}-container" --format="{{.Names}}" | xargs -r docker stop | xargs -r docker rm`,
+        {
+          stdio: 'inherit',
+        }
+      )
+
+      // 创建 docker 容器
+      execSync(
+        `docker run -d -p 8888:80 --name ${data.repository.name}-container ${data.repository.name}-image:latest`,
+        {
+          stdio: 'inherit',
+        }
+      )
+
+      console.log('deploy success')
+    }
+    res.end('ok')
+  })
+  .listen(6666, () => {
+    console.log('server is ready')
+  })
