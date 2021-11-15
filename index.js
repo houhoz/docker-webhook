@@ -36,7 +36,7 @@ app.use(async (ctx, next) => {
   }
 })
 // post
-router.post('/dockerDeploy', async ctx => {
+router.post('/deploy', async ctx => {
   const port = ctx.query.port
   const header = ctx.request.header
   // 参数就是payload
